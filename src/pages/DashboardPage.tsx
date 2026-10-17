@@ -5,12 +5,10 @@ import { useAuth } from '../context/useAuth';
 import type { Agent } from '../types';
 import {
   getAccountAgents,
-  provisionAccountAgent,
   getFriendlyErrorMessage,
   RELAY_API_URL,
 } from '../lib/relay';
 import { AgentCard } from '../components/AgentCard';
-import { OnboardingCard } from '../components/OnboardingCard';
 
 export const DashboardPage: React.FC = () => {
   const { user, getValidAccessToken, isDemoMode } = useAuth();
@@ -20,8 +18,6 @@ export const DashboardPage: React.FC = () => {
   const [initialApiKey, setInitialApiKey] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [onboardingError, setOnboardingError] = useState<string | null>(null);
-  const [isSubmittingOnboarding, setIsSubmittingOnboarding] = useState<boolean>(false);
   const [accessToken, setAccessToken] = useState<string>('');
   const [retryTrigger, setRetryTrigger] = useState<number>(0);
 
@@ -61,11 +57,13 @@ export const DashboardPage: React.FC = () => {
                 setAgent(parsed.agent);
                 setInitialApiKey(parsed.api_key);
               } catch {
-                setAgent(null);
+                navigate('/onboarding', { replace: true });
+                return;
               }
             } else {
-              // Show onboarding to choose custom agent ID
-              setAgent(null);
+              // PRD §7.1: If empty -> redirect /onboarding
+              navigate('/onboarding', { replace: true });
+              return;
             }
           }
         } catch {
@@ -77,10 +75,12 @@ export const DashboardPage: React.FC = () => {
                 setAgent(parsed.agent);
                 setInitialApiKey(parsed.api_key);
               } catch {
-                setAgent(null);
+                navigate('/onboarding', { replace: true });
+                return;
               }
             } else {
-              setAgent(null);
+              navigate('/onboarding', { replace: true });
+              return;
             }
           }
         } finally {
@@ -97,8 +97,9 @@ export const DashboardPage: React.FC = () => {
         if (agents && agents.length > 0) {
           setAgent(agents[0]);
         } else {
-          // If no agent yet, user will be prompted with OnboardingCard to choose their Agent ID
-          setAgent(null);
+          // PRD §7.1: If empty -> redirect /onboarding
+          navigate('/onboarding', { replace: true });
+          return;
         }
       } catch (err: unknown) {
         if (!isCancelled) {
@@ -116,54 +117,6 @@ export const DashboardPage: React.FC = () => {
       isCancelled = true;
     };
   }, [getValidAccessToken, navigate, isDemoMode, retryTrigger]);
-
-  const handleOnboardingSubmit = async (chosenHandle: string) => {
-    setIsSubmittingOnboarding(true);
-    setOnboardingError(null);
-
-    if (isDemoMode) {
-      try {
-        const provisioned = await provisionAccountAgent(accessToken, chosenHandle);
-        setAgent(provisioned.agent);
-        setInitialApiKey(provisioned.api_key);
-        localStorage.setItem(
-          'agentmail_demo_agent',
-          JSON.stringify({ agent: provisioned.agent, api_key: provisioned.api_key })
-        );
-      } catch {
-        // Fallback demo provisioning
-        const demoAgent: Agent = {
-          id: `demo-${Date.now()}`,
-          handle: chosenHandle,
-          address: `${chosenHandle}@agentmail`,
-          fingerprint: 'A3F9 27C1 88D0 4E21 99B2 5F10',
-          custody_mode: 'server_kek',
-          created_at: new Date().toISOString(),
-          display_name: chosenHandle,
-        };
-        const demoKey = `am_live_demo_${chosenHandle}_${Math.random().toString(36).substring(2, 10)}`;
-        setAgent(demoAgent);
-        setInitialApiKey(demoKey);
-        localStorage.setItem(
-          'agentmail_demo_agent',
-          JSON.stringify({ agent: demoAgent, api_key: demoKey })
-        );
-      } finally {
-        setIsSubmittingOnboarding(false);
-      }
-      return;
-    }
-
-    try {
-      const provisioned = await provisionAccountAgent(accessToken, chosenHandle);
-      setAgent(provisioned.agent);
-      setInitialApiKey(provisioned.api_key);
-    } catch (err: unknown) {
-      setOnboardingError(getFriendlyErrorMessage(err));
-    } finally {
-      setIsSubmittingOnboarding(false);
-    }
-  };
 
   return (
     <div className="min-h-[85vh] max-w-5xl mx-auto px-4 sm:px-6 py-10">
@@ -240,16 +193,7 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Onboarding View (when user has no agent yet) */}
-      {!loading && !error && !agent && (
-        <OnboardingCard
-          onSubmit={handleOnboardingSubmit}
-          isLoading={isSubmittingOnboarding}
-          error={onboardingError}
-        />
-      )}
-
-      {/* Active Agent Card (when agent exists) */}
+      {/* Active Agent Card */}
       {!loading && !error && agent && (
         <AgentCard
           agent={agent}

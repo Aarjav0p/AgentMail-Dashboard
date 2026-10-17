@@ -2,6 +2,7 @@ import {
   type Agent,
   type AgentsListResponse,
   type ApiKeyResponse,
+  type HandleAvailabilityResponse,
   type ProvisionResponse,
   RelayApiError,
   type RelayApiErrorPayload,
@@ -20,6 +21,12 @@ export const MCP_URL =
 export function getFriendlyErrorMessage(error: unknown): string {
   if (error instanceof RelayApiError) {
     switch (error.code) {
+      case 'HANDLE_TAKEN':
+      case 'handle_taken':
+        return 'That agent ID is already in use. Please try another.';
+      case 'VALIDATION_ERROR':
+      case 'validation_error':
+        return error.message || 'Invalid agent ID format. Allowed characters: lowercase letters, numbers, and hyphens (3–32 chars).';
       case 'rate_limited':
       case 'RATE_LIMITED':
         return 'Rate limit reached. Please wait a short while before trying again.';
@@ -112,16 +119,33 @@ export async function getAccountAgents(accessToken: string): Promise<Agent[]> {
 }
 
 /**
+ * GET /v1/account/handle-available?handle=…
+ * Live handle availability check
+ */
+export async function checkHandleAvailability(
+  accessToken: string,
+  handle: string
+): Promise<HandleAvailabilityResponse> {
+  return await relayFetch<HandleAvailabilityResponse>(
+    `/v1/account/handle-available?handle=${encodeURIComponent(handle)}`,
+    accessToken,
+    {
+      method: 'GET',
+    }
+  );
+}
+
+/**
  * POST /v1/account/agents
- * Idempotently provisions a new agent for the authenticated user
+ * Provisions an agent with the chosen handle for the authenticated user
  */
 export async function provisionAccountAgent(
   accessToken: string,
-  handle?: string
+  handle: string
 ): Promise<ProvisionResponse> {
   return await relayFetch<ProvisionResponse>('/v1/account/agents', accessToken, {
     method: 'POST',
-    body: handle ? JSON.stringify({ handle }) : undefined,
+    body: JSON.stringify({ handle }),
   });
 }
 

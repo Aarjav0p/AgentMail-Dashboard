@@ -24,6 +24,12 @@ export interface ApiKeyResponse {
   api_key: string;
 }
 
+export interface HandleAvailabilityResponse {
+  handle: string;
+  available: boolean;
+  reason?: 'taken' | 'reserved' | 'invalid';
+}
+
 export interface RelayApiErrorPayload {
   error: {
     code: string;
