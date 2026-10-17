@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   BookUser,
   Plus,
@@ -18,6 +18,7 @@ import {
   createAccountContact,
   updateAccountContact,
   deleteAccountContact,
+  checkHandleAvailability,
   RelayApiError,
   getFriendlyErrorMessage,
 } from '../lib/relay';
@@ -31,11 +32,9 @@ interface ContactsCardProps {
   isDemoMode?: boolean;
 }
 
-const RESERVED_TARGET_HANDLES = new Set([
-  'admin', 'root', 'support', 'postmaster', 'security', 'abuse',
-  'noreply', 'no-reply', 'mail', 'agentmail', 'system', 'api',
-  'help', 'info', 'billing',
-]);
+// Regex validation rules per PRD §6.7
+const ALIAS_REGEX = /^[a-z0-9][a-z0-9_-]{1,31}$/;
+const TARGET_REGEX = /^[a-z0-9][a-z0-9-]{2,31}$/;
 
 export const ContactsCard: React.FC<ContactsCardProps> = ({
   contacts,
@@ -54,6 +53,9 @@ export const ContactsCard: React.FC<ContactsCardProps> = ({
   const [note, setNote] = useState('');
 
   const [formError, setFormError] = useState<string | null>(null);
+  const [targetCheck, setTargetCheck] = useState<'idle' | 'checking' | 'reserved' | 'error'>('idle');
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -61,13 +63,9 @@ export const ContactsCard: React.FC<ContactsCardProps> = ({
   const [contactToDelete, setContactToDelete] = useState<UserContact | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Regex validation rules per PRD §6.7
-  const aliasRegex = /^[a-z0-9][a-z0-9_-]{1,31}$/;
-  const targetRegex = /^[a-z0-9][a-z0-9-]{2,31}$/;
-
-  const isAliasValid = aliasRegex.test(alias);
-  const isTargetValid = targetRegex.test(targetHandle) && !RESERVED_TARGET_HANDLES.has(targetHandle);
-  const isFormValid = isAliasValid && isTargetValid && note.length <= 200;
+  const isAliasValid = ALIAS_REGEX.test(alias);
+  const isTargetValid = TARGET_REGEX.test(targetHandle);
+  const isFormValid = isAliasValid && isTargetValid && note.length <= 200 && targetCheck !== 'reserved';
 
   const handleOpenAddForm = () => {
     setEditingContact(null);
@@ -75,6 +73,7 @@ export const ContactsCard: React.FC<ContactsCardProps> = ({
     setTargetHandle('');
     setNote('');
     setFormError(null);
+    setTargetCheck('idle');
     setIsFormOpen(true);
   };
 
@@ -84,6 +83,7 @@ export const ContactsCard: React.FC<ContactsCardProps> = ({
     setTargetHandle(contact.target_handle);
     setNote(contact.note || '');
     setFormError(null);
+    setTargetCheck('idle');
     setIsFormOpen(true);
   };
 
@@ -91,7 +91,70 @@ export const ContactsCard: React.FC<ContactsCardProps> = ({
     setIsFormOpen(false);
     setEditingContact(null);
     setFormError(null);
+    setTargetCheck('idle');
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
   };
+
+  // Debounced live availability check for target handle (DASH-02 §3)
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    if (!isFormOpen) {
+      return;
+    }
+
+    // Skip entirely when editing a contact whose target is unchanged (DASH-02 §3)
+    if (editingContact && targetHandle === editingContact.target_handle) {
+      return;
+    }
+
+    if (!TARGET_REGEX.test(targetHandle)) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    debounceTimerRef.current = setTimeout(async () => {
+      setTargetCheck('checking');
+
+      if (isDemoMode) {
+        await new Promise((r) => setTimeout(r, 150));
+        if (isCancelled) return;
+        const DEMO_RESERVED = new Set(['admin', 'postmaster']); // demo theater only — NOT the real list
+        if (DEMO_RESERVED.has(targetHandle)) {
+          setTargetCheck('reserved');
+        } else {
+          setTargetCheck('idle');
+        }
+        return;
+      }
+
+      try {
+        const result = await checkHandleAvailability(accessToken, targetHandle);
+        if (isCancelled) return;
+        if (result.reason === 'reserved') {
+          setTargetCheck('reserved');
+        } else {
+          setTargetCheck('idle');
+        }
+      } catch {
+        if (!isCancelled) {
+          setTargetCheck('error');
+        }
+      }
+    }, 400);
+
+    return () => {
+      isCancelled = true;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [targetHandle, editingContact, isFormOpen, accessToken, isDemoMode]);
 
   const handleAliasChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Auto-lowercase; strip @agentmail or @; keep characters in [a-z0-9_-]
@@ -113,16 +176,12 @@ export const ContactsCard: React.FC<ContactsCardProps> = ({
       .replace(/[^a-z0-9-]/g, '');
     setTargetHandle(cleaned);
     setFormError(null);
+    setTargetCheck('idle');
   };
 
   const handleSaveContact = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid || isSubmitting) return;
-
-    if (RESERVED_TARGET_HANDLES.has(targetHandle)) {
-      setFormError(`'${targetHandle}' is a reserved handle and cannot receive mail.`);
-      return;
-    }
 
     setIsSubmitting(true);
     setFormError(null);
@@ -353,9 +412,15 @@ export const ContactsCard: React.FC<ContactsCardProps> = ({
                     @agentmail
                   </span>
                 </div>
-                <span className="text-[11px] text-zinc-400 mt-1 block">
-                  Letters, numbers, hyphens (3–32 chars)
-                </span>
+                <div className="mt-1 flex items-center justify-between text-[11px]">
+                  <span className="text-zinc-400">Letters, numbers, hyphens (3–32 chars)</span>
+                  {targetCheck === 'checking' && (
+                    <span className="text-zinc-400 flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin text-cyan-400" />
+                      <span>Checking...</span>
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -383,10 +448,14 @@ export const ContactsCard: React.FC<ContactsCardProps> = ({
             </div>
 
             {/* Inline Error Message */}
-            {formError && (
+            {(formError || targetCheck === 'reserved') && (
               <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-300 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                <div>{formError}</div>
+                <div>
+                  {targetCheck === 'reserved'
+                    ? `'${targetHandle}' is a reserved handle and cannot receive mail.`
+                    : formError}
+                </div>
               </div>
             )}
 

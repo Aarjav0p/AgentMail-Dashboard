@@ -169,6 +169,11 @@ describe('Onboarding Page (PRD §7.1 & §10)', () => {
 
   it('shows error indicator when handle is reserved', async () => {
     vi.spyOn(RelayModule, 'getAccountAgents').mockResolvedValue([]);
+    vi.spyOn(RelayModule, 'checkHandleAvailability').mockResolvedValue({
+      handle: 'postmaster',
+      available: false,
+      reason: 'reserved',
+    });
 
     render(
       <MemoryRouter initialEntries={['/onboarding']}>

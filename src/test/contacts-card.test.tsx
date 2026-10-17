@@ -223,4 +223,180 @@ describe('ContactsCard (PRD §6.7 & §10)', () => {
     fireEvent.click(retryBtn);
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
+
+  // DASH-02: Live server check for reserved contact targets
+  it('blocks save and displays error message when target handle is reserved (DASH-02 test 1)', async () => {
+    vi.spyOn(RelayModule, 'checkHandleAvailability').mockResolvedValue({
+      handle: 'admin',
+      available: false,
+      reason: 'reserved',
+    });
+
+    render(
+      <ContactsCard
+        contacts={sampleContacts}
+        accessToken="mock-token"
+        onContactsUpdated={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add contact/i }));
+
+    const aliasInput = screen.getByPlaceholderText(/e\.g\. dad/i);
+    const targetInput = screen.getByPlaceholderText('dadagent');
+
+    fireEvent.change(aliasInput, { target: { value: 'admin-contact' } });
+    fireEvent.change(targetInput, { target: { value: 'admin' } });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/'admin' is a reserved handle and cannot receive mail\./i)
+      ).toBeInTheDocument();
+    });
+
+    const saveBtn = screen.getByRole('button', { name: /save contact/i });
+    expect(saveBtn).toBeDisabled();
+  });
+
+  it('does NOT block save when target handle is already taken by a registered agent (DASH-02 test 2 - regression check)', async () => {
+    vi.spyOn(RelayModule, 'checkHandleAvailability').mockResolvedValue({
+      handle: 'bobagent',
+      available: false,
+      reason: 'taken',
+    });
+
+    render(
+      <ContactsCard
+        contacts={sampleContacts}
+        accessToken="mock-token"
+        onContactsUpdated={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add contact/i }));
+
+    const aliasInput = screen.getByPlaceholderText(/e\.g\. dad/i);
+    const targetInput = screen.getByPlaceholderText('dadagent');
+
+    fireEvent.change(aliasInput, { target: { value: 'bob' } });
+    fireEvent.change(targetInput, { target: { value: 'bobagent' } });
+
+    // Wait past debounce
+    await waitFor(() => {
+      const saveBtn = screen.getByRole('button', { name: /save contact/i });
+      expect(saveBtn).not.toBeDisabled();
+    });
+
+    expect(
+      screen.queryByText(/is a reserved handle and cannot receive mail/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it('does NOT block save when target handle is available (DASH-02 test 3)', async () => {
+    vi.spyOn(RelayModule, 'checkHandleAvailability').mockResolvedValue({
+      handle: 'newagent',
+      available: true,
+    });
+
+    render(
+      <ContactsCard
+        contacts={sampleContacts}
+        accessToken="mock-token"
+        onContactsUpdated={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add contact/i }));
+
+    const aliasInput = screen.getByPlaceholderText(/e\.g\. dad/i);
+    const targetInput = screen.getByPlaceholderText('dadagent');
+
+    fireEvent.change(aliasInput, { target: { value: 'newguy' } });
+    fireEvent.change(targetInput, { target: { value: 'newagent' } });
+
+    await waitFor(() => {
+      const saveBtn = screen.getByRole('button', { name: /save contact/i });
+      expect(saveBtn).not.toBeDisabled();
+    });
+  });
+
+  it('does NOT block save when availability check throws error (DASH-02 test 4 - advisory UX)', async () => {
+    vi.spyOn(RelayModule, 'checkHandleAvailability').mockRejectedValue(
+      new Error('Relay connection error')
+    );
+
+    render(
+      <ContactsCard
+        contacts={sampleContacts}
+        accessToken="mock-token"
+        onContactsUpdated={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add contact/i }));
+
+    const aliasInput = screen.getByPlaceholderText(/e\.g\. dad/i);
+    const targetInput = screen.getByPlaceholderText('dadagent');
+
+    fireEvent.change(aliasInput, { target: { value: 'charlie' } });
+    fireEvent.change(targetInput, { target: { value: 'charlie-bot' } });
+
+    await waitFor(() => {
+      const saveBtn = screen.getByRole('button', { name: /save contact/i });
+      expect(saveBtn).not.toBeDisabled();
+    });
+  });
+
+  it('skips the availability check in edit mode when target handle is unchanged (DASH-02 test 5)', async () => {
+    const checkSpy = vi.spyOn(RelayModule, 'checkHandleAvailability');
+
+    render(
+      <ContactsCard
+        contacts={sampleContacts}
+        accessToken="mock-token"
+        onContactsUpdated={vi.fn()}
+      />
+    );
+
+    // Edit first contact ('dad' -> 'dadagent')
+    const editButtons = screen.getAllByTitle('Edit contact');
+    fireEvent.click(editButtons[0]);
+
+    expect(screen.getByDisplayValue('dad')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('dadagent')).toBeInTheDocument();
+
+    // Verify spy was never called
+    expect(checkSpy).not.toHaveBeenCalled();
+
+    const updateBtn = screen.getByRole('button', { name: /update contact/i });
+    expect(updateBtn).not.toBeDisabled();
+  });
+
+  it('simulates reserved handle in demo mode using demo fixture (DASH-02 test 6)', async () => {
+    render(
+      <ContactsCard
+        contacts={sampleContacts}
+        accessToken="mock-token"
+        onContactsUpdated={vi.fn()}
+        isDemoMode={true}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add contact/i }));
+
+    const aliasInput = screen.getByPlaceholderText(/e\.g\. dad/i);
+    const targetInput = screen.getByPlaceholderText('dadagent');
+
+    fireEvent.change(aliasInput, { target: { value: 'admin-alias' } });
+    fireEvent.change(targetInput, { target: { value: 'admin' } });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/'admin' is a reserved handle and cannot receive mail\./i)
+      ).toBeInTheDocument();
+    });
+
+    const saveBtn = screen.getByRole('button', { name: /save contact/i });
+    expect(saveBtn).toBeDisabled();
+  });
 });

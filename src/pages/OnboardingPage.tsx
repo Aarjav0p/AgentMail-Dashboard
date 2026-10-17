@@ -10,12 +10,6 @@ import {
 } from '../lib/relay';
 import type { HandleAvailabilityResponse } from '../types';
 
-const RESERVED_HANDLES = new Set([
-  'admin', 'root', 'support', 'postmaster', 'security', 'abuse',
-  'noreply', 'no-reply', 'mail', 'agentmail', 'system', 'api',
-  'help', 'info', 'billing',
-]);
-
 export const OnboardingPage: React.FC = () => {
   const { getValidAccessToken, isDemoMode } = useAuth();
   const navigate = useNavigate();
@@ -113,23 +107,16 @@ export const OnboardingPage: React.FC = () => {
         return;
       }
 
-      if (RESERVED_HANDLES.has(clean)) {
-        setAvailability({
-          handle: clean,
-          available: false,
-          reason: 'reserved',
-        });
-        setCheckingAvailability(false);
-        return;
-      }
-
       setCheckingAvailability(true);
 
       // In demo mode without active backend, provide realistic local availability
       if (isDemoMode) {
         await new Promise((r) => setTimeout(r, 150));
         if (isCancelled) return;
-        if (clean === 'taken' || clean === 'bob') {
+        const DEMO_RESERVED = new Set(['admin', 'postmaster']); // demo theater only — NOT the real list
+        if (DEMO_RESERVED.has(clean)) {
+          setAvailability({ handle: clean, available: false, reason: 'reserved' });
+        } else if (clean === 'taken' || clean === 'bob') {
           setAvailability({ handle: clean, available: false, reason: 'taken' });
         } else {
           setAvailability({ handle: clean, available: true });
