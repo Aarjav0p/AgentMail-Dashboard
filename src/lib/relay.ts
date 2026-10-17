@@ -2,11 +2,18 @@ import {
   type Agent,
   type AgentsListResponse,
   type ApiKeyResponse,
+  type ContactResponse,
+  type ContactsListResponse,
+  type CreateContactPayload,
   type HandleAvailabilityResponse,
   type ProvisionResponse,
   RelayApiError,
   type RelayApiErrorPayload,
+  type UpdateContactPayload,
+  type UserContact,
 } from '../types';
+
+export { RelayApiError };
 
 export const RELAY_API_URL = (
   import.meta.env.VITE_RELAY_API_URL || 'http://localhost:8000'
@@ -21,12 +28,15 @@ export const MCP_URL =
 export function getFriendlyErrorMessage(error: unknown): string {
   if (error instanceof RelayApiError) {
     switch (error.code) {
+      case 'ALIAS_EXISTS':
+      case 'alias_exists':
+        return error.message || 'You already have a contact with this alias.';
       case 'HANDLE_TAKEN':
       case 'handle_taken':
         return 'That agent ID is already in use. Please try another.';
       case 'VALIDATION_ERROR':
       case 'validation_error':
-        return error.message || 'Invalid agent ID format. Allowed characters: lowercase letters, numbers, and hyphens (3–32 chars).';
+        return error.message || 'Invalid format. Allowed characters: lowercase letters, numbers, and hyphens.';
       case 'rate_limited':
       case 'RATE_LIMITED':
         return 'Rate limit reached. Please wait a short while before trying again.';
@@ -35,7 +45,7 @@ export function getFriendlyErrorMessage(error: unknown): string {
         return 'Your session has expired or is invalid. Please sign in again.';
       case 'not_found':
       case 'NOT_FOUND':
-        return 'Agent not found or access denied.';
+        return 'Resource not found or access denied.';
       case 'handle_collision':
         return 'Unable to allocate a unique handle. Please try again in a few moments.';
       default:
@@ -104,6 +114,11 @@ async function relayFetch<T>(
     throw new RelayApiError(errorMessage, errorCode, res.status, details);
   }
 
+  // Handle 204 No Content
+  if (res.status === 204) {
+    return undefined as unknown as T;
+  }
+
   return (await res.json()) as T;
 }
 
@@ -169,4 +184,56 @@ export async function rotateAgentApiKey(accessToken: string, agentId: string): P
     method: 'POST',
   });
   return data.api_key;
+}
+
+/**
+ * GET /v1/account/contacts
+ * Returns list of contact aliases sorted by alias
+ */
+export async function getAccountContacts(accessToken: string): Promise<UserContact[]> {
+  const data = await relayFetch<ContactsListResponse>('/v1/account/contacts', accessToken, {
+    method: 'GET',
+  });
+  return data.contacts || [];
+}
+
+/**
+ * POST /v1/account/contacts
+ * Creates a new contact alias
+ */
+export async function createAccountContact(
+  accessToken: string,
+  payload: CreateContactPayload
+): Promise<UserContact> {
+  const data = await relayFetch<ContactResponse>('/v1/account/contacts', accessToken, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return data.contact;
+}
+
+/**
+ * PATCH /v1/account/contacts/{id}
+ * Updates an existing contact alias
+ */
+export async function updateAccountContact(
+  accessToken: string,
+  id: string,
+  payload: UpdateContactPayload
+): Promise<UserContact> {
+  const data = await relayFetch<ContactResponse>(`/v1/account/contacts/${encodeURIComponent(id)}`, accessToken, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  return data.contact;
+}
+
+/**
+ * DELETE /v1/account/contacts/{id}
+ * Deletes a contact alias
+ */
+export async function deleteAccountContact(accessToken: string, id: string): Promise<void> {
+  await relayFetch<void>(`/v1/account/contacts/${encodeURIComponent(id)}`, accessToken, {
+    method: 'DELETE',
+  });
 }

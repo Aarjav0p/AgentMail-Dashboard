@@ -2,13 +2,27 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle, RefreshCw, Sparkles, Mail } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
-import type { Agent } from '../types';
+import type { Agent, UserContact } from '../types';
 import {
   getAccountAgents,
+  getAccountContacts,
   getFriendlyErrorMessage,
   RELAY_API_URL,
 } from '../lib/relay';
 import { AgentCard } from '../components/AgentCard';
+import { ContactsCard } from '../components/ContactsCard';
+
+const DEFAULT_DEMO_CONTACTS: UserContact[] = [
+  {
+    id: 'demo-contact-1',
+    alias: 'dad',
+    target_handle: 'dadagent',
+    address: 'dadagent@agentmail',
+    note: "Dad's coding assistant",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
 
 export const DashboardPage: React.FC = () => {
   const { user, getValidAccessToken, isDemoMode } = useAuth();
@@ -21,10 +35,20 @@ export const DashboardPage: React.FC = () => {
   const [accessToken, setAccessToken] = useState<string>('');
   const [retryTrigger, setRetryTrigger] = useState<number>(0);
 
+  // Contacts state
+  const [contacts, setContacts] = useState<UserContact[]>([]);
+  const [contactsError, setContactsError] = useState<string | null>(null);
+  const [contactsRetryTrigger, setContactsRetryTrigger] = useState<number>(0);
+
   const handleRetry = useCallback(() => {
     setRetryTrigger((prev) => prev + 1);
   }, []);
 
+  const handleRetryContacts = useCallback(() => {
+    setContactsRetryTrigger((prev) => prev + 1);
+  }, []);
+
+  // 1. Fetch agents & auth state
   useEffect(() => {
     let isCancelled = false;
 
@@ -49,7 +73,6 @@ export const DashboardPage: React.FC = () => {
           if (agents && agents.length > 0) {
             setAgent(agents[0]);
           } else {
-            // Check if demo agent exists in localStorage
             const savedDemo = localStorage.getItem('agentmail_demo_agent');
             if (savedDemo) {
               try {
@@ -61,7 +84,6 @@ export const DashboardPage: React.FC = () => {
                 return;
               }
             } else {
-              // PRD §7.1: If empty -> redirect /onboarding
               navigate('/onboarding', { replace: true });
               return;
             }
@@ -118,10 +140,60 @@ export const DashboardPage: React.FC = () => {
     };
   }, [getValidAccessToken, navigate, isDemoMode, retryTrigger]);
 
+  // 2. Fetch contacts alongside agents (PRD §7.1 resilience rule)
+  useEffect(() => {
+    if (!accessToken) return;
+    let isCancelled = false;
+
+    async function loadContacts() {
+      setContactsError(null);
+
+      if (isDemoMode) {
+        const savedContacts = localStorage.getItem('agentmail_demo_contacts');
+        if (savedContacts) {
+          try {
+            setContacts(JSON.parse(savedContacts));
+          } catch {
+            setContacts(DEFAULT_DEMO_CONTACTS);
+          }
+        } else {
+          setContacts(DEFAULT_DEMO_CONTACTS);
+        }
+        return;
+      }
+
+      try {
+        const list = await getAccountContacts(accessToken);
+        if (!isCancelled) {
+          setContacts(list);
+        }
+      } catch (err: unknown) {
+        if (!isCancelled) {
+          console.error('Failed to load contacts:', err);
+          // Surface retry on ContactsCard without blanking the rest of the dashboard
+          setContactsError(getFriendlyErrorMessage(err));
+        }
+      }
+    }
+
+    loadContacts();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [accessToken, isDemoMode, contactsRetryTrigger]);
+
+  const handleContactsUpdated = (updatedList: UserContact[]) => {
+    setContacts(updatedList);
+    if (isDemoMode) {
+      localStorage.setItem('agentmail_demo_contacts', JSON.stringify(updatedList));
+    }
+  };
+
   return (
-    <div className="min-h-[85vh] max-w-5xl mx-auto px-4 sm:px-6 py-10">
+    <div className="min-h-[85vh] max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-10">
       {/* Header Banner */}
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
@@ -134,7 +206,7 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Manage your AI agent identity, cryptographic custody, and MCP credentials
+            Manage your AI agent identity, cryptographic custody, MCP credentials, and contact aliases
           </p>
         </div>
 
@@ -195,12 +267,24 @@ export const DashboardPage: React.FC = () => {
 
       {/* Active Agent Card */}
       {!loading && !error && agent && (
-        <AgentCard
-          agent={agent}
-          initialApiKey={initialApiKey}
-          accessToken={accessToken}
-          onKeyRotated={(newKey) => setInitialApiKey(newKey)}
-        />
+        <div className="space-y-10">
+          <AgentCard
+            agent={agent}
+            initialApiKey={initialApiKey}
+            accessToken={accessToken}
+            onKeyRotated={(newKey) => setInitialApiKey(newKey)}
+          />
+
+          {/* Contacts Card (Address Book) */}
+          <ContactsCard
+            contacts={contacts}
+            accessToken={accessToken}
+            onContactsUpdated={handleContactsUpdated}
+            error={contactsError}
+            onRetry={handleRetryContacts}
+            isDemoMode={isDemoMode}
+          />
+        </div>
       )}
     </div>
   );

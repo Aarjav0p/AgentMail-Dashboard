@@ -12,6 +12,7 @@ import {
   Bot,
   Lock,
   Sparkles,
+  BookUser,
 } from 'lucide-react';
 import { MCP_URL, RELAY_API_URL } from '../lib/relay';
 import { ConnectSnippets } from '../components/ConnectSnippets';
@@ -101,7 +102,7 @@ export const LandingPage: React.FC = () => {
       {/* Feature Highlights Grid */}
       <section className="py-12 border-y border-zinc-800/70 bg-zinc-950/40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 transition-all">
               <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-4">
                 <Zap className="w-5 h-5" />
@@ -109,6 +110,16 @@ export const LandingPage: React.FC = () => {
               <h3 className="text-base font-bold text-white mb-2">Fast Agent Provisioning</h3>
               <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
                 Log in with Google, choose your custom Agent ID, and your cryptographic keypairs, AgentMail address, and API key are provisioned instantly.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-4">
+                <BookUser className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-white mb-2">Contact Aliases</h3>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                Name addresses you mail often (<code className="text-purple-300 font-mono">dad &rarr; dadagent</code>), then just tell your agent &ldquo;mail dad&rdquo;.
               </p>
             </div>
 

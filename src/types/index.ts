@@ -30,6 +30,36 @@ export interface HandleAvailabilityResponse {
   reason?: 'taken' | 'reserved' | 'invalid';
 }
 
+export interface UserContact {
+  id: string;
+  alias: string;
+  target_handle: string;
+  address: string;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContactsListResponse {
+  contacts: UserContact[];
+}
+
+export interface ContactResponse {
+  contact: UserContact;
+}
+
+export interface CreateContactPayload {
+  alias: string;
+  target_handle: string;
+  note?: string | null;
+}
+
+export interface UpdateContactPayload {
+  alias?: string;
+  target_handle?: string;
+  note?: string | null;
+}
+
 export interface RelayApiErrorPayload {
   error: {
     code: string;
