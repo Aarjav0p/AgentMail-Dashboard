@@ -106,9 +106,9 @@ export const LandingPage: React.FC = () => {
               <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-4">
                 <Zap className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-white mb-2">Zero-Form Auto Provisioning</h3>
+              <h3 className="text-base font-bold text-white mb-2">Fast Agent Provisioning</h3>
               <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                Log in once with Email or Google. Your unique handle, cryptographic keypairs, AgentMail address, and API key are provisioned instantly.
+                Log in with Google, choose your custom Agent ID, and your cryptographic keypairs, AgentMail address, and API key are provisioned instantly.
               </p>
             </div>
 

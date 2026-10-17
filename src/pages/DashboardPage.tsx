@@ -10,19 +10,7 @@ import {
   RELAY_API_URL,
 } from '../lib/relay';
 import { AgentCard } from '../components/AgentCard';
-
-// Fallback demo agent for instant preview if relay server is offline in demo mode
-const DEMO_FALLBACK_AGENT: Agent = {
-  id: '018f3a90-84c1-7991-bc45-e62a9314dc80',
-  handle: 'alice',
-  address: 'alice@agentmail',
-  fingerprint: 'A3F9 27C1 88D0 4E21 99B2 5F10',
-  custody_mode: 'server_kek',
-  created_at: new Date().toISOString(),
-  display_name: 'Alice Agent',
-};
-
-const DEMO_FALLBACK_API_KEY = 'am_live_9kP2xL1mQ4vR7tY8zW3bC5nE0sA6dF2gH1jK3lM5nO7p';
+import { OnboardingCard } from '../components/OnboardingCard';
 
 export const DashboardPage: React.FC = () => {
   const { user, getValidAccessToken, isDemoMode } = useAuth();
@@ -32,6 +20,8 @@ export const DashboardPage: React.FC = () => {
   const [initialApiKey, setInitialApiKey] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  const [isSubmittingOnboarding, setIsSubmittingOnboarding] = useState<boolean>(false);
   const [accessToken, setAccessToken] = useState<string>('');
   const [retryTrigger, setRetryTrigger] = useState<number>(0);
 
@@ -55,7 +45,7 @@ export const DashboardPage: React.FC = () => {
       }
       setAccessToken(token);
 
-      // Demo mode fallback handling
+      // Demo mode handling
       if (isDemoMode) {
         try {
           const agents = await getAccountAgents(token);
@@ -63,15 +53,35 @@ export const DashboardPage: React.FC = () => {
           if (agents && agents.length > 0) {
             setAgent(agents[0]);
           } else {
-            const provisioned = await provisionAccountAgent(token);
-            if (isCancelled) return;
-            setAgent(provisioned.agent);
-            setInitialApiKey(provisioned.api_key);
+            // Check if demo agent exists in localStorage
+            const savedDemo = localStorage.getItem('agentmail_demo_agent');
+            if (savedDemo) {
+              try {
+                const parsed = JSON.parse(savedDemo);
+                setAgent(parsed.agent);
+                setInitialApiKey(parsed.api_key);
+              } catch {
+                setAgent(null);
+              }
+            } else {
+              // Show onboarding to choose custom agent ID
+              setAgent(null);
+            }
           }
         } catch {
           if (!isCancelled) {
-            setAgent(DEMO_FALLBACK_AGENT);
-            setInitialApiKey(DEMO_FALLBACK_API_KEY);
+            const savedDemo = localStorage.getItem('agentmail_demo_agent');
+            if (savedDemo) {
+              try {
+                const parsed = JSON.parse(savedDemo);
+                setAgent(parsed.agent);
+                setInitialApiKey(parsed.api_key);
+              } catch {
+                setAgent(null);
+              }
+            } else {
+              setAgent(null);
+            }
           }
         } finally {
           if (!isCancelled) setLoading(false);
@@ -87,15 +97,12 @@ export const DashboardPage: React.FC = () => {
         if (agents && agents.length > 0) {
           setAgent(agents[0]);
         } else {
-          // Provision automatically on first sign-in (PRD §6.1 & §7.1)
-          const provisioned = await provisionAccountAgent(token);
-          if (isCancelled) return;
-          setAgent(provisioned.agent);
-          setInitialApiKey(provisioned.api_key);
+          // If no agent yet, user will be prompted with OnboardingCard to choose their Agent ID
+          setAgent(null);
         }
       } catch (err: unknown) {
         if (!isCancelled) {
-          console.error('Failed to load/provision agent:', err);
+          console.error('Failed to load agents:', err);
           setError(getFriendlyErrorMessage(err));
         }
       } finally {
@@ -109,6 +116,54 @@ export const DashboardPage: React.FC = () => {
       isCancelled = true;
     };
   }, [getValidAccessToken, navigate, isDemoMode, retryTrigger]);
+
+  const handleOnboardingSubmit = async (chosenHandle: string) => {
+    setIsSubmittingOnboarding(true);
+    setOnboardingError(null);
+
+    if (isDemoMode) {
+      try {
+        const provisioned = await provisionAccountAgent(accessToken, chosenHandle);
+        setAgent(provisioned.agent);
+        setInitialApiKey(provisioned.api_key);
+        localStorage.setItem(
+          'agentmail_demo_agent',
+          JSON.stringify({ agent: provisioned.agent, api_key: provisioned.api_key })
+        );
+      } catch {
+        // Fallback demo provisioning
+        const demoAgent: Agent = {
+          id: `demo-${Date.now()}`,
+          handle: chosenHandle,
+          address: `${chosenHandle}@agentmail`,
+          fingerprint: 'A3F9 27C1 88D0 4E21 99B2 5F10',
+          custody_mode: 'server_kek',
+          created_at: new Date().toISOString(),
+          display_name: chosenHandle,
+        };
+        const demoKey = `am_live_demo_${chosenHandle}_${Math.random().toString(36).substring(2, 10)}`;
+        setAgent(demoAgent);
+        setInitialApiKey(demoKey);
+        localStorage.setItem(
+          'agentmail_demo_agent',
+          JSON.stringify({ agent: demoAgent, api_key: demoKey })
+        );
+      } finally {
+        setIsSubmittingOnboarding(false);
+      }
+      return;
+    }
+
+    try {
+      const provisioned = await provisionAccountAgent(accessToken, chosenHandle);
+      setAgent(provisioned.agent);
+      setInitialApiKey(provisioned.api_key);
+    } catch (err: unknown) {
+      setOnboardingError(getFriendlyErrorMessage(err));
+    } finally {
+      setIsSubmittingOnboarding(false);
+    }
+  };
 
   return (
     <div className="min-h-[85vh] max-w-5xl mx-auto px-4 sm:px-6 py-10">
@@ -146,12 +201,12 @@ export const DashboardPage: React.FC = () => {
             Checking agent mailbox...
           </div>
           <p className="text-xs text-zinc-400 max-w-sm">
-            Fetching your agent credentials or provisioning a new identity automatically.
+            Fetching your agent credentials...
           </p>
         </div>
       )}
 
-      {/* Error state */}
+      {/* Relay Error state */}
       {!loading && error && (
         <div className="bg-zinc-900 border border-rose-500/30 rounded-3xl p-8 sm:p-10 shadow-2xl">
           <div className="flex items-start gap-4 mb-4">
@@ -161,7 +216,7 @@ export const DashboardPage: React.FC = () => {
             <div>
               <h2 className="text-lg font-bold text-white">Relay Connection Error</h2>
               <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-                We couldn't connect to the relay service to load or provision your agent.
+                We couldn't connect to the relay service to load your agent.
               </p>
             </div>
           </div>
@@ -176,7 +231,7 @@ export const DashboardPage: React.FC = () => {
             </span>
             <button
               onClick={handleRetry}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow-lg shadow-cyan-600/20 transition-all"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow-lg shadow-cyan-600/20 transition-all cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Retry Connection</span>
@@ -185,7 +240,16 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Loaded Agent Card */}
+      {/* Onboarding View (when user has no agent yet) */}
+      {!loading && !error && !agent && (
+        <OnboardingCard
+          onSubmit={handleOnboardingSubmit}
+          isLoading={isSubmittingOnboarding}
+          error={onboardingError}
+        />
+      )}
+
+      {/* Active Agent Card (when agent exists) */}
       {!loading && !error && agent && (
         <AgentCard
           agent={agent}

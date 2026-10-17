@@ -115,9 +115,13 @@ export async function getAccountAgents(accessToken: string): Promise<Agent[]> {
  * POST /v1/account/agents
  * Idempotently provisions a new agent for the authenticated user
  */
-export async function provisionAccountAgent(accessToken: string): Promise<ProvisionResponse> {
+export async function provisionAccountAgent(
+  accessToken: string,
+  handle?: string
+): Promise<ProvisionResponse> {
   return await relayFetch<ProvisionResponse>('/v1/account/agents', accessToken, {
     method: 'POST',
+    body: handle ? JSON.stringify({ handle }) : undefined,
   });
 }
 
