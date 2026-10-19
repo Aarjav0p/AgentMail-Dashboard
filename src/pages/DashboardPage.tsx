@@ -206,7 +206,7 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Manage your AI agent identity, cryptographic custody, MCP credentials, and contact aliases
+            Manage your AI agent identity, MCP credentials, and contact aliases
           </p>
         </div>
 

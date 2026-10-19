@@ -5,16 +5,13 @@ import {
   Eye,
   EyeOff,
   RefreshCw,
-  ShieldCheck,
   Key,
-  Info,
   Calendar,
   Sparkles,
 } from 'lucide-react';
 import type { Agent } from '../types';
 import { revealAgentApiKey, rotateAgentApiKey, getFriendlyErrorMessage } from '../lib/relay';
 import { ConnectSnippets } from './ConnectSnippets';
-import { CustodyModal } from './CustodyModal';
 import { RotateConfirmModal } from './RotateConfirmModal';
 
 interface AgentCardProps {
@@ -35,7 +32,6 @@ export const AgentCard: React.FC<AgentCardProps> = ({
   const [isRevealing, setIsRevealing] = useState<boolean>(false);
   const [isRotating, setIsRotating] = useState<boolean>(false);
   const [isRotateModalOpen, setIsRotateModalOpen] = useState<boolean>(false);
-  const [isCustodyModalOpen, setIsCustodyModalOpen] = useState<boolean>(false);
   const [revealCountdown, setRevealCountdown] = useState<number>(initialApiKey ? 60 : 0);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -137,15 +133,6 @@ export const AgentCard: React.FC<AgentCardProps> = ({
                 <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
                   {agent.handle}
                 </h2>
-                <button
-                  onClick={() => setIsCustodyModalOpen(true)}
-                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20 transition-colors"
-                  title="Click to view custody model details"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Server Custody</span>
-                  <Info className="w-3 h-3 opacity-70" />
-                </button>
               </div>
               <div className="flex items-center gap-3 text-xs text-zinc-400 mt-1">
                 <span className="flex items-center gap-1">
@@ -315,11 +302,6 @@ export const AgentCard: React.FC<AgentCardProps> = ({
       </div>
 
       {/* Modals */}
-      <CustodyModal
-        isOpen={isCustodyModalOpen}
-        onClose={() => setIsCustodyModalOpen(false)}
-      />
-
       <RotateConfirmModal
         isOpen={isRotateModalOpen}
         onClose={() => setIsRotateModalOpen(false)}

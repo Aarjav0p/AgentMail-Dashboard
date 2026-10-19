@@ -10,17 +10,17 @@ import {
   Terminal,
   ExternalLink,
   Bot,
-  Lock,
   Sparkles,
   BookUser,
+  LayoutDashboard,
 } from 'lucide-react';
-import { MCP_URL, RELAY_API_URL } from '../lib/relay';
+import { MCP_URL } from '../lib/relay';
+import { useAuth } from '../context/useAuth';
 import { ConnectSnippets } from '../components/ConnectSnippets';
-import { CustodyModal } from '../components/CustodyModal';
 
 export const LandingPage: React.FC = () => {
+  const { user } = useAuth();
   const [copiedMcpUrl, setCopiedMcpUrl] = useState(false);
-  const [isCustodyModalOpen, setIsCustodyModalOpen] = useState(false);
 
   const handleCopyMcpUrl = () => {
     navigator.clipboard.writeText(MCP_URL);
@@ -50,13 +50,24 @@ export const LandingPage: React.FC = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <Link
-              to="/login"
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-semibold shadow-xl shadow-cyan-600/25 hover:shadow-cyan-600/35 transition-all text-sm group"
-            >
-              <span>Sign in to get your API key — free</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-            </Link>
+            {user ? (
+              <Link
+                to="/app"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-semibold shadow-xl shadow-cyan-600/25 hover:shadow-cyan-600/35 transition-all text-sm group"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Go to Dashboard</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            ) : (
+              <Link
+                to="/login"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-semibold shadow-xl shadow-cyan-600/25 hover:shadow-cyan-600/35 transition-all text-sm group"
+              >
+                <span>Sign in to get your API key — free</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            )}
             <a
               href="#setup"
               className="w-full sm:w-auto px-6 py-3.5 rounded-xl border border-zinc-700/80 bg-zinc-800/40 hover:bg-zinc-800 text-zinc-300 hover:text-white font-semibold transition-colors text-sm"
@@ -139,15 +150,9 @@ export const LandingPage: React.FC = () => {
               </div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-base font-bold text-white">Anytime Key View &amp; Rotate</h3>
-                <button
-                  onClick={() => setIsCustodyModalOpen(true)}
-                  className="text-[11px] text-cyan-400 hover:underline"
-                >
-                  Trust Model
-                </button>
               </div>
               <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                Keys are stored encrypted at rest (server KEK) with audited on-demand reveal and one-click key rotation whenever needed.
+                Keys are stored encrypted at rest with audited on-demand reveal and one-click key rotation whenever needed.
               </p>
             </div>
           </div>
@@ -169,47 +174,23 @@ export const LandingPage: React.FC = () => {
           <ConnectSnippets />
 
           <div className="mt-8 text-center">
-            <Link
-              to="/login"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
-            >
-              <span>Need your API key? Sign in to get yours in one click</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Trust Model Note */}
-      <section className="py-10 px-4 sm:px-6 border-t border-zinc-800/80 bg-zinc-950/20">
-        <div className="max-w-4xl mx-auto p-5 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <Lock className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" />
-            <div>
-              <div className="text-sm font-semibold text-zinc-200">
-                Transparent Trust Model
-              </div>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Dashboard-registered agents use server-side key custody (like standard webmail). For passphrase-protected client-side keys, use the advanced registration page.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={() => setIsCustodyModalOpen(true)}
-              className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold underline underline-offset-2"
-            >
-              Learn More
-            </button>
-            <a
-              href={`${RELAY_API_URL}/register`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white transition-colors flex items-center gap-1"
-            >
-              <span>Legacy Register</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
+            {user ? (
+              <Link
+                to="/app"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+              >
+                <span>View your API key and manage agents in your dashboard</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            ) : (
+              <Link
+                to="/login"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+              >
+                <span>Need your API key? Sign in to get yours in one click</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            )}
           </div>
         </div>
       </section>
@@ -233,23 +214,9 @@ export const LandingPage: React.FC = () => {
               <span>GitHub</span>
               <ExternalLink className="w-3 h-3" />
             </a>
-            <a
-              href={`${RELAY_API_URL}/register`}
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-zinc-200 transition-colors"
-            >
-              Advanced: register with your own passphrase
-            </a>
           </div>
         </div>
       </footer>
-
-      {/* Custody Modal */}
-      <CustodyModal
-        isOpen={isCustodyModalOpen}
-        onClose={() => setIsCustodyModalOpen(false)}
-      />
     </div>
   );
 };

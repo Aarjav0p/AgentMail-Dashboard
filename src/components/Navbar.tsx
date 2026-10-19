@@ -1,8 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, LogOut, ExternalLink, ShieldAlert, Sparkles } from 'lucide-react';
+import { Mail, LogOut, ShieldAlert, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
-import { RELAY_API_URL } from '../lib/relay';
 
 export const Navbar: React.FC = () => {
   const { user, signOut, isDemoMode, isConfigured } = useAuth();
@@ -41,15 +40,6 @@ export const Navbar: React.FC = () => {
                 Dashboard
               </Link>
             )}
-            <a
-              href={`${RELAY_API_URL}/register`}
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-zinc-100 transition-colors flex items-center gap-1 text-xs text-zinc-400"
-              title="Passphrase-based client-side key generation"
-            >
-              Passphrase Register <ExternalLink className="w-3 h-3" />
-            </a>
           </nav>
         </div>
 
