@@ -149,6 +149,14 @@ Headers:
             </pre>
           </div>
         )}
+
+        <p className="mt-3 pt-3 border-t border-zinc-800/60 text-[11px] text-zinc-500 leading-relaxed">
+          If your MCP client has a dedicated{' '}
+          <span className="text-zinc-400">API-key / Bearer-token</span> field, paste only the raw
+          key — the client adds the <span className="text-zinc-400">Bearer</span> prefix itself.
+          Raw header fields (as shown above) need the full{' '}
+          <code className="text-cyan-400/80">Authorization: Bearer …</code> line.
+        </p>
       </div>
     </div>
   );
