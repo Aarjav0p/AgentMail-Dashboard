@@ -206,7 +206,7 @@ export const LandingPage: React.FC = () => {
 
           <div className="flex items-center gap-6">
             <a
-              href="https://github.com"
+              href="https://github.com/Aarjav0p/AgentMail"
               target="_blank"
               rel="noreferrer"
               className="hover:text-zinc-200 transition-colors flex items-center gap-1"
